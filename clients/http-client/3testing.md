@@ -36,3 +36,30 @@ val client = HttpClient(MockEngine) {
 private val Url.hostWithPortIfRequired: String get() = if (port == protocol.defaultPort) host else hostWithPort
 private val Url.fullUrl: String get() = "${protocol.name}://$hostWithPortIfRequired$fullPath"
 ```
+
+If your HttpClient uses a serializer to parse the response, such as the JacksonSerializer, this should be mirrored in the HttpClient used for mocking. The MockEngine should respond with a ByteReadChannel containing the Json response desired.
+
+Please refer to the example below:
+
+```kotlin
+data class HelloWorldResponse(val message: String)
+val jsonMapper = jacksonObjectMapper()
+val resp = HelloWorldResponse("Hello, World")
+val mockEngine = MockEngine {
+    request ->
+    when (request.url.fullUrl) {
+        "https://example.org/" -> {
+            respond(
+                ByteReadChannel(jsonMapper.writeValueAsString(resp).toByteArray(Charsets.UTF_8)),
+                HttpStatusCode.OK,
+                headersOf("Content-Type" to listOf(ContentType.Application.Json.toString()))
+            )
+        }
+    }
+}
+val mockClient = HttpClient(mockEngine){
+    install(JsonFeature){
+        serializer = JacksonSerializer()
+    }
+}
+```
